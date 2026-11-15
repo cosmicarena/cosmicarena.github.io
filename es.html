@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<link rel="icon" href="./vector/favicon.svg">
+    <title>Cosmic Arena - Versión Beta</title>
+	<link rel="stylesheet" href="./css/styles.css">
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div id="damage-vignette"></div>
+
+    <div id="ui">
+        <div class="stat-row">Dinero: $<span id="cash">0</span></div>
+        <div class="stat-row">
+            Vida: <div id="health-bar-container"><div id="health-bar-fill"></div></div>
+        </div>
+    </div>
+    <div id="notifications"></div>
+    
+    <div id="shop">
+        <h3>TIENDA DE MEJORAS</h3>
+        <button class="upgrade-btn" id="btn-speed" onclick="buyUpgrade('speed')">Velocidad del tanque ($<span id="cost-speed">50</span>)</button>
+        <button class="upgrade-btn" id="btn-rate" onclick="buyUpgrade('rate')">Cadencia y velocidad de tiro ($<span id="cost-rate">50</span>)</button>
+        <button class="upgrade-btn" id="btn-multishot" onclick="buyUpgrade('multishot')">Multicañón ($<span id="cost-multishot">400</span>)</button>
+        <button class="upgrade-btn" id="btn-maxhp" onclick="buyUpgrade('maxHp')">Aumento de vida máxima ($<span id="cost-maxHp">100</span>)</button>
+        <div class="sfx-row" onclick="toggleSfx()">
+            <span>Efectos de sonido</span>
+            <span id="sfx-toggle-icon" class="sfx-toggle-icon">🔊</span>
+        </div>
+    </div>
+
+    <div id="instructions">Haz clic en la arena para apuntar con el <b>Mouse</b> (o <b>arrastra con el dedo</b>) | <b>W/S</b> Adelante/Atrás | <b>A/D</b> Moverse a los lados | <b>Pellizcar/Desplazar</b> Zoom</div>
+
+	<div class="bug-report">
+	  <a href="cosmicarenadev@gmail.com?subject=Reporte%20de%20Error%20-%20Cosmic%20Arena&body=Hola,%20Encontré%20el%20siguiente%20problema%20en%20el%20juego:%0A%0A-%20Descripción%20del%20error:" target="_blank" rel="noopener noreferrer">Report a bug</a>
+	</div>
+
+    <div id="gameover">
+        <h1>PARTIDA TERMINADA</h1>
+        <p>Tu tanque fue destruido en combate.</p>
+        <p>Objetivos destruidos: <span id="stat-targets">0</span></p>
+        <p>Tanques enemigos derrotados: <span id="stat-bots">0</span></p>
+        <button id="restart-btn" onclick="restartGame()">JUGAR DE NUEVO</button>
+    </div>
+
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="./js/es.js"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"408d8dc64f1b4ab5936a656cb9db7d53","spa":2}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"408d8dc64f1b4ab5936a656cb9db7d53","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
