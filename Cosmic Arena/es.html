@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+	<link rel="icon" href="./vector/favicon.svg">
+    <title>Cosmic Arena - Versión Beta</title>
+	<link rel="stylesheet" href="./css/styles.css">
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div id="damage-vignette"></div>
+
+    <div id="ui">
+        <div class="stat-row">Dinero: $<span id="cash">0</span></div>
+        <div class="stat-row">
+            Vida: <div id="health-bar-container"><div id="health-bar-fill"></div></div>
+        </div>
+    </div>
+    <div id="notifications"></div>
+    
+    <div id="shop">
+        <h3>TIENDA DE MEJORAS</h3>
+        <button class="upgrade-btn" id="btn-speed" onclick="buyUpgrade('speed')">Velocidad del tanque ($<span id="cost-speed">50</span>)</button>
+        <button class="upgrade-btn" id="btn-rate" onclick="buyUpgrade('rate')">Cadencia y velocidad de tiro ($<span id="cost-rate">50</span>)</button>
+        <button class="upgrade-btn" id="btn-multishot" onclick="buyUpgrade('multishot')">Multicañón ($<span id="cost-multishot">400</span>)</button>
+        <button class="upgrade-btn" id="btn-maxhp" onclick="buyUpgrade('maxHp')">Aumento de vida máxima ($<span id="cost-maxHp">100</span>)</button>
+        <div class="sfx-row" onclick="toggleSfx()">
+            <span>Efectos de sonido</span>
+            <span id="sfx-toggle-icon" class="sfx-toggle-icon">🔊</span>
+        </div>
+    </div>
+
+    <div id="instructions">Haz clic en la arena para apuntar con el <b>Mouse</b> (o <b>arrastra con el dedo</b>) | <b>W/S</b> Adelante/Atrás | <b>A/D</b> Moverse a los lados | <b>Pellizcar/Desplazar</b> Zoom</div>
+
+	<div class="bug-report">
+	  <a href="mailto:djmsteelgarwood@gmail.com?subject=Reporte%20de%20Errores%20-%20Cosmic%20Arena&body=Hola,%20encontr%C3%A9%20el%20siguiente%20problema%20en%20el%20juego:%0A%0A-%20Descripci%C3%B3n%20del%20error:" target="_blank" rel="noopener noreferrer">Reportar un error</a>
+	</div>
+
+    <div id="gameover">
+        <h1>PARTIDA TERMINADA</h1>
+        <p>Tu tanque fue destruido en combate.</p>
+        <p>Objetivos destruidos: <span id="stat-targets">0</span></p>
+        <p>Tanques enemigos derrotados: <span id="stat-bots">0</span></p>
+        <button id="restart-btn" onclick="restartGame()">JUGAR DE NUEVO</button>
+    </div>
+
+    <script src="./js/es.js"></script>
+</body>
+</html>
