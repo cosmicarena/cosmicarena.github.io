@@ -23,15 +23,16 @@
         <div class="stat-row">
             Vida: <div id="health-bar-container"><div id="health-bar-fill"></div></div>
         </div>
+        <div class="objective" id="objective">Derrota a los dos Centinelas exteriores para abrir las puertas.</div>
     </div>
     <div id="notifications"></div>
     
     <div id="shop">
         <h3>TIENDA DE MEJORAS</h3>
-        <button class="upgrade-btn" id="btn-speed" onclick="buyUpgrade('speed')">Velocidad del tanque ($<span id="cost-speed">50</span>)</button>
-        <button class="upgrade-btn" id="btn-rate" onclick="buyUpgrade('rate')">Cadencia y velocidad de tiro ($<span id="cost-rate">50</span>)</button>
-        <button class="upgrade-btn" id="btn-multishot" onclick="buyUpgrade('multishot')">Multicañón ($<span id="cost-multishot">400</span>)</button>
-        <button class="upgrade-btn" id="btn-maxhp" onclick="buyUpgrade('maxHp')">Aumento de vida máxima ($<span id="cost-maxHp">100</span>)</button>
+        <button class="upgrade-btn" id="btn-speed" onclick="buyUpgrade('speed')">Velocidad del tanque ($<span id="cost-speed">100</span>)</button>
+        <button class="upgrade-btn" id="btn-rate" onclick="buyUpgrade('rate')">Cadencia y velocidad de tiro ($<span id="cost-rate">125</span>)</button>
+        <button class="upgrade-btn" id="btn-multishot" onclick="buyUpgrade('multishot')">Multicañón ($<span id="cost-multishot">2500</span>)</button>
+        <button class="upgrade-btn" id="btn-maxhp" onclick="buyUpgrade('maxHp')">Aumento de vida máxima ($<span id="cost-maxHp">200</span>)</button>
         <div class="sfx-row" onclick="toggleSfx()">
             <span>Efectos de sonido</span>
             <span id="sfx-toggle-icon" class="sfx-toggle-icon">🔊</span>
@@ -45,8 +46,8 @@
 	</div>
 
     <div id="gameover">
-        <h1>PARTIDA TERMINADA</h1>
-        <p>Tu tanque fue destruido en combate.</p>
+        <h1 id="gameover-title">PARTIDA TERMINADA</h1>
+        <p id="gameover-message">Tu tanque fue destruido en combate.</p>
         <p>Objetivos destruidos: <span id="stat-targets">0</span></p>
         <p>Tanques enemigos derrotados: <span id="stat-bots">0</span></p>
         <button id="restart-btn" onclick="restartGame()">JUGAR DE NUEVO</button>

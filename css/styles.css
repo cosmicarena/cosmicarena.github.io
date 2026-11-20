@@ -47,6 +47,17 @@ body {
 .stat-row {
 	margin-bottom: 6px;
 }
+.objective {
+	max-width: 250px;
+	margin-top: 10px;
+	padding: 8px 10px;
+	border: 1px solid rgba(0, 255, 136, 0.35);
+	border-radius: 6px;
+	background: rgba(15, 20, 35, 0.78);
+	color: #d7ffe9;
+	font-size: 12px;
+	line-height: 1.4;
+}
 #health-bar-container {
 	width: 180px;
 	height: 16px;
@@ -208,6 +219,17 @@ body {
 	z-index: 100;
 	pointer-events: auto;
 	display: none;
+	opacity: 0;
+}
+#gameover.visible {
+	animation: endgameFadeIn 0.7s ease-out forwards;
+}
+@keyframes endgameFadeIn {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+	#gameover.visible { animation-duration: 0.01ms; }
 }
 #gameover h1 {
 	color: #ff3344;
@@ -298,4 +320,8 @@ h1 {
 }
 .credits strong {
 	color: var(--accent-cyan);
+}
+#gameover.victory h1 {
+	color: #00ff88;
+	text-shadow: 0 0 25px rgba(0, 255, 136, 0.7);
 }
