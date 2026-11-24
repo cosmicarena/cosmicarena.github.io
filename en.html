@@ -26,12 +26,17 @@
         <div class="objective" id="objective">Defeat both Outer Sentinels to open the fortress gates.</div>
     </div>
     <div id="notifications"></div>
+    <div id="portal-countdown" class="portal-countdown" hidden aria-live="assertive">
+        <span class="portal-countdown-label">PORTAL SYNCHRONIZING</span>
+        <strong><span id="portal-countdown-seconds">5</span><small>s</small></strong>
+        <span class="portal-countdown-hint">Stay inside the portal to complete extraction</span>
+    </div>
     
     <div id="shop">
         <h3>UPGRADES</h3>
         <button class="upgrade-btn" id="btn-speed" onclick="buyUpgrade('speed')">Tank Speed ($<span id="cost-speed">100</span>)</button>
         <button class="upgrade-btn" id="btn-rate" onclick="buyUpgrade('rate')">Fire Rate & Velocity ($<span id="cost-rate">125</span>)</button>
-        <button class="upgrade-btn" id="btn-multishot" onclick="buyUpgrade('multishot')">Multi-Barrel ($<span id="cost-multishot">2500</span>)</button>
+        <button class="upgrade-btn" id="btn-multishot" onclick="buyUpgrade('multishot')">Upgrade to Double Barrel ($<span id="cost-multishot">1500</span>)</button>
         <button class="upgrade-btn" id="btn-maxhp" onclick="buyUpgrade('maxHp')">Max HP Boost ($<span id="cost-maxHp">200</span>)</button>
         <div class="sfx-row" onclick="toggleSfx()">
             <span>Sound effects</span>

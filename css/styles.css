@@ -143,6 +143,56 @@ body {
 	pointer-events: none;
 	z-index: 30;
 }
+.portal-countdown {
+	position: fixed;
+	left: 50%;
+	bottom: clamp(24px, 8vh, 72px);
+	transform: translateX(-50%);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 5px;
+	min-width: min(320px, calc(100vw - 32px));
+	padding: 14px 22px 16px;
+	border: 1px solid rgba(126, 255, 246, 0.72);
+	border-radius: 18px;
+	background: linear-gradient(135deg, rgba(6, 18, 38, 0.92), rgba(33, 13, 69, 0.88));
+	box-shadow: 0 0 24px rgba(0, 238, 255, 0.24), inset 0 0 26px rgba(117, 76, 255, 0.2);
+	color: #e8ffff;
+	text-align: center;
+	text-shadow: 0 0 12px rgba(102, 255, 245, 0.55);
+	backdrop-filter: blur(12px);
+	pointer-events: none;
+	z-index: 35;
+	animation: portalCountdownIn 0.45s ease-out both;
+}
+.portal-countdown[hidden] { display: none; }
+.portal-countdown-label {
+	color: #88fff2;
+	font-size: 11px;
+	font-weight: 800;
+	letter-spacing: 0.22em;
+}
+.portal-countdown strong {
+	color: #ffffff;
+	font-size: clamp(44px, 8vw, 66px);
+	font-variant-numeric: tabular-nums;
+	line-height: 1;
+	text-shadow: 0 0 12px #00f5ff, 0 0 34px rgba(154, 89, 255, 0.9);
+}
+.portal-countdown strong small {
+	margin-left: 4px;
+	color: #9afcf2;
+	font-size: 0.38em;
+}
+.portal-countdown-hint {
+	color: #d3d5ff;
+	font-size: 12px;
+}
+@keyframes portalCountdownIn {
+	from { opacity: 0; transform: translate(-50%, 14px) scale(0.94); }
+	to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
 .notif {
 	background: rgba(0, 255, 136, 0.9);
 	color: #0f1423;
@@ -210,7 +260,7 @@ body {
 	left: 0;
 	width: 100vw;
 	height: 100vh;
-	background: rgba(10, 15, 25, 0.96);
+	background: radial-gradient(ellipse at center, rgba(19, 28, 54, 0.86), rgba(4, 7, 16, 0.97));
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
@@ -220,16 +270,18 @@ body {
 	pointer-events: auto;
 	display: none;
 	opacity: 0;
+	backdrop-filter: blur(10px);
 }
 #gameover.visible {
-	animation: endgameFadeIn 0.7s ease-out forwards;
+	animation: endgameFadeIn 1.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 @keyframes endgameFadeIn {
-	from { opacity: 0; }
-	to { opacity: 1; }
+	from { opacity: 0; backdrop-filter: blur(0); }
+	to { opacity: 1; backdrop-filter: blur(10px); }
 }
 @media (prefers-reduced-motion: reduce) {
 	#gameover.visible { animation-duration: 0.01ms; }
+	.portal-countdown { animation-duration: 0.01ms; }
 }
 #gameover h1 {
 	color: #ff3344;

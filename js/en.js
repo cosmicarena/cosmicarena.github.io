@@ -100,10 +100,13 @@ let playerHp = 100;
 let maxPlayerHp = 100;
 let isGameOver = false;
 let isEnding = false;
+let portalCountdownRemaining = 0;
 let endgameTimeout = null;
 let playerDamageCooldown = 0;
 let targetsDestroyedCount = 0;
 let botsDestroyedCount = 0;
+let sphereRewardsPaid = 0;
+let enemyBotRewardsPaid = 0;
 let screenShake = 0;
 let lowHpTimer = 0;
 
@@ -212,10 +215,10 @@ window.addEventListener('touchend', (e) => {
 });
 
 let stats = {
-	speed: { level: 1, cost: 100, val: 0.55, mult: 1.55 },
-	rate: { level: 1, cost: 125, val: 12, bulletSpeed: 4.5, mult: 1.6 },
-	multishot: { level: 1, cost: 2500, val: 1, max: 4, mult: 3.0 },
-	maxHp: { level: 1, cost: 200, val: 100, mult: 1.6 }
+	speed: { level: 1, maxLevel: 5, cost: 100, val: 0.55, mult: 1.55 },
+	rate: { level: 1, maxLevel: 5, cost: 125, val: 12, bulletSpeed: 4.5, mult: 1.6 },
+	multishot: { level: 1, cost: 1500, val: 1, max: 4, mult: 1.6 },
+	maxHp: { level: 1, maxLevel: 3, cost: 200, val: 100, mult: 1.6 }
 };
 
 let barrelsGroup = new THREE.Group();
@@ -250,10 +253,26 @@ function updatePlayerHpUI() {
 	fill.style.backgroundColor = hpPct <= 25 ? '#ff3344' : '#00ff88';
 }
 
+function updateMultishotUpgradeButton() {
+	const button = document.getElementById('btn-multishot');
+	const upgrade = stats.multishot;
+	if (!button || !upgrade) return;
+	const nextBarrelCount = upgrade.val + 1;
+	const barrelNames = { 2: 'Double', 3: 'Triple', 4: 'Quad' };
+	if (upgrade.val >= upgrade.max) {
+		button.disabled = true;
+		button.textContent = 'Quad Barrel Unlocked';
+		return;
+	}
+	button.disabled = false;
+	button.innerHTML = `Upgrade to ${barrelNames[nextBarrelCount]} Barrel ($<span id="cost-multishot">${upgrade.cost}</span>)`;
+}
+updateMultishotUpgradeButton();
+
 function damagePlayer(amount, message) {
 	if (isEnding || isGameOver || playerDamageCooldown > 0) return false;
 	playerHp = Math.max(0, playerHp - amount);
-	playerDamageCooldown = 12;
+	playerDamageCooldown = 18;
 	updatePlayerHpUI();
 	showNotification(message, true);
 	playSound('playerDamage');
@@ -266,7 +285,7 @@ function damagePlayer(amount, message) {
 window.buyUpgrade = function(type) {
 	let u = stats[type];
 	if (!u || isEnding || isGameOver ||
-		(type === 'multishot' && u.val >= u.max)) return;
+		(type === 'multishot' && u.val >= u.max) || (u.maxLevel && u.level >= u.maxLevel)) return;
 
 	if (cash >= u.cost) {
 		cash -= u.cost;
@@ -281,26 +300,28 @@ window.buyUpgrade = function(type) {
 		}
 		if (type === 'maxHp') {
 			maxPlayerHp += 40;
-			playerHp += 40;
+			playerHp = Math.min(maxPlayerHp, playerHp + 20);
 			updatePlayerHpUI();
 		}
 		if (type === 'multishot') {
 			u.val += 1;
 			updateTankBarrels();
-			if (u.val >= u.max) {
-				const btn = document.getElementById('btn-multishot');
-				if (btn) {
-					btn.disabled = true;
-					btn.innerText = 'Max Barrels Reached';
-				}
-			}
 		}
 
-		if (type !== 'multishot' || u.val < u.max) {
+		const maxed = (u.maxLevel && u.level >= u.maxLevel) || (type === 'multishot' && u.val >= u.max);
+		if (maxed) {
+			const maxLabels = { speed: 'Speed Maxed', rate: 'Fire Rate Maxed', maxHp: 'Max HP Reached', multishot: 'Max Barrels Reached' };
+			const btn = document.getElementById(type === 'maxHp' ? 'btn-maxhp' : `btn-${type}`);
+			if (btn) {
+				btn.disabled = true;
+				btn.innerText = maxLabels[type];
+			}
+		} else {
 			u.cost = Math.floor(u.cost * u.mult);
 			const costElement = document.getElementById(`cost-${type}`);
 			if (costElement) costElement.innerText = u.cost;
 		}
+		if (type === 'multishot') updateMultishotUpgradeButton();
 	}
 };
 
@@ -311,7 +332,11 @@ scene.fog = new THREE.FogExp2(0x0b0f19, 0.0018);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1800);
 const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -319,12 +344,13 @@ document.body.appendChild(renderer.domElement);
 // Lighting
 const ambientLight = new THREE.AmbientLight(0x38bdf8, 0.5);
 scene.add(ambientLight);
+scene.add(new THREE.HemisphereLight(0x8bdcff, 0x101426, 0.45));
 
 const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
 sunLight.position.set(60, 120, 60);
 sunLight.castShadow = true;
-sunLight.shadow.mapSize.width = 1024;
-sunLight.shadow.mapSize.height = 1024;
+	sunLight.shadow.mapSize.width = 1536;
+	sunLight.shadow.mapSize.height = 1536;
 scene.add(sunLight);
 
 // Starry Night Skybox
@@ -363,9 +389,9 @@ scene.add(gridHelper);
 const floorGeo = new THREE.PlaneGeometry(arenaSize, arenaSize);
 floorGeo.rotateX(-Math.PI / 2);
 const floorMat = new THREE.MeshStandardMaterial({
-	color: 0x0f172a,
-	roughness: 0.85,
-	metalness: 0.15
+	color: 0x080d18,
+	roughness: 0.92,
+	metalness: 0.06
 });
 const floor = new THREE.Mesh(floorGeo, floorMat);
 floor.receiveShadow = true;
@@ -583,6 +609,9 @@ const portal = new THREE.Group();
 const portalFaces = [];
 const portalRings = [];
 const portalCores = [];
+const portalArcs = [];
+const portalParticleFields = [];
+const portalCoreMaterials = [];
 const portalLocations = [
 	{ x: 0, z: -towerHalfSize, rotation: Math.PI },
 	{ x: 0, z: towerHalfSize, rotation: 0 },
@@ -593,14 +622,90 @@ portalLocations.forEach(location => {
 	const face = new THREE.Group();
 	face.position.set(location.x, 2.6, location.z);
 	face.rotation.y = location.rotation;
-	const ring = new THREE.Mesh(new THREE.TorusGeometry(9, 1.25, 12, 40), new THREE.MeshBasicMaterial({ color: 0x00ff88 }));
-	const core = new THREE.Mesh(new THREE.CircleGeometry(7.8, 32), new THREE.MeshBasicMaterial({ color: 0x073b35, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
-	core.position.z = 0.05;
-	face.add(ring, core);
+	const outerFrame = new THREE.Mesh(
+		new THREE.TorusGeometry(10.2, 0.42, 12, 64),
+		new THREE.MeshStandardMaterial({ color: 0x5d32a8, emissive: 0x572cff, emissiveIntensity: 2.2, metalness: 0.65, roughness: 0.22 })
+	);
+	const ring = new THREE.Mesh(
+		new THREE.TorusGeometry(8.9, 0.58, 14, 72),
+		new THREE.MeshStandardMaterial({ color: 0x6bfff4, emissive: 0x00eaff, emissiveIntensity: 3.2, metalness: 0.25, roughness: 0.18 })
+	);
+	const innerRing = new THREE.Mesh(
+		new THREE.TorusGeometry(7.9, 0.16, 8, 64),
+		new THREE.MeshBasicMaterial({ color: 0xc8ffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending })
+	);
+	const arcMaterial = new THREE.MeshBasicMaterial({ color: 0xff4ce1, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
+	const arcs = [];
+	for (let arcIndex = 0; arcIndex < 3; arcIndex++) {
+		const arc = new THREE.Mesh(new THREE.TorusGeometry(9.55, 0.24, 8, 48, Math.PI * 0.58), arcMaterial.clone());
+		arc.rotation.z = arcIndex * (Math.PI * 2 / 3);
+		arcs.push(arc);
+	}
+	const coreMaterial = new THREE.ShaderMaterial({
+		uniforms: {
+			uTime: { value: 0 },
+			uCyan: { value: new THREE.Color(0x04f5d2) },
+			uViolet: { value: new THREE.Color(0x673bff) },
+			uPink: { value: new THREE.Color(0xff3fba) }
+		},
+		vertexShader: `
+			varying vec2 vUv;
+			void main() {
+				vUv = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+			}
+		`,
+		fragmentShader: `
+			uniform float uTime;
+			uniform vec3 uCyan;
+			uniform vec3 uViolet;
+			uniform vec3 uPink;
+			varying vec2 vUv;
+			void main() {
+				vec2 p = vUv - 0.5;
+				float radius = length(p) * 2.0;
+				float angle = atan(p.y, p.x);
+				float spiral = sin(angle * 5.0 - radius * 24.0 - uTime * 2.7);
+				float ripples = sin(radius * 42.0 - angle * 3.0 - uTime * 4.0);
+				float bands = sin(angle * 9.0 + radius * 18.0 + uTime * 1.8);
+				vec3 color = mix(uViolet, uCyan, smoothstep(-0.65, 0.75, spiral + bands * 0.32));
+				color = mix(color, uPink, smoothstep(0.35, 0.95, ripples + spiral * 0.28) * 0.55);
+				float glow = 0.68 + 0.22 * sin(uTime * 2.2 + angle * 2.0);
+				float alpha = (1.0 - smoothstep(0.72, 1.0, radius)) * glow;
+				alpha *= 0.72 + 0.22 * abs(ripples);
+				color += vec3(0.55, 0.85, 1.0) * pow(max(0.0, 1.0 - radius), 5.0);
+				gl_FragColor = vec4(color, alpha);
+			}
+		`,
+		transparent: true,
+		depthWrite: false,
+		 side: THREE.DoubleSide,
+		blending: THREE.AdditiveBlending
+	});
+	const core = new THREE.Mesh(new THREE.CircleGeometry(7.7, 64), coreMaterial);
+	core.position.z = 0.04;
+	innerRing.position.z = 0.06;
+	outerFrame.position.z = -0.02;
+	ring.position.z = 0.08;
+	const particlePositions = new Float32Array(72 * 3);
+	for (let i = 0; i < 72; i++) {
+		const angle = Math.random() * Math.PI * 2;
+		const radius = 1.2 + Math.random() * 6.2;
+		particlePositions[i * 3] = Math.cos(angle) * radius;
+		particlePositions[i * 3 + 1] = Math.sin(angle) * radius;
+		particlePositions[i * 3 + 2] = 0.12 + Math.random() * 0.08;
+	}
+	const particleGeometry = new THREE.BufferGeometry();
+	particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+	const particleField = new THREE.Points(particleGeometry, new THREE.PointsMaterial({ color: 0xb9ffff, size: 0.32, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+	face.add(outerFrame, ring, innerRing, core, ...arcs, particleField);
 	portal.add(face);
 	portalFaces.push(face);
 	portalRings.push(ring);
 	portalCores.push(core);
+	portalArcs.push(...arcs);
+	portalParticleFields.push(particleField);
+	portalCoreMaterials.push(coreMaterial);
 });
 portal.visible = false;
 scene.add(portal);
@@ -623,10 +728,10 @@ function isBlockedByFortress(x, z, radius = 0) {
 
 function hasClearShot(from, to) {
 	const distance = Math.hypot(to.x - from.x, to.z - from.z);
-	const steps = Math.max(1, Math.ceil(distance / 8));
+	const steps = Math.max(1, Math.ceil(distance));
 	for (let i = 1; i < steps; i++) {
 		const t = i / steps;
-		if (isBlockedByFortress(from.x + (to.x - from.x) * t, from.z + (to.z - from.z) * t, 0.1)) return false;
+		if (isBlockedByFortress(from.x + (to.x - from.x) * t, from.z + (to.z - from.z) * t, 0.25)) return false;
 	}
 	return true;
 }
@@ -844,6 +949,7 @@ spawnSpheres(sphereCount);
 for (let i = 0; i < enemyBotCount; i++) spawnSingleEnemyBot();
 
 const patrolPairs = [];
+let lastPatrolUpdateTime = performance.now();
 let bossTank = null;
 let bossDefeated = false;
 let isGameWon = false;
@@ -885,6 +991,19 @@ function createFortressTank(config) {
 		bulletSpeed: config.bulletSpeed,
 		maxHp: config.hp
 	};
+	if (config.isBoss) {
+		const aura = new THREE.Mesh(
+			new THREE.TorusGeometry(5.2, 0.14, 8, 48),
+			new THREE.MeshBasicMaterial({ color: 0xff315f, transparent: true, opacity: 0.7, depthWrite: false })
+		);
+		aura.rotation.x = Math.PI / 2;
+		aura.position.y = 0.18;
+		tank.add(aura);
+		const coreLight = new THREE.PointLight(0xff315f, 1.6, 42);
+		coreLight.position.set(0, 3, 0);
+		tank.add(coreLight);
+		tank.userData.bossAura = aura;
+	}
 	updateHealthBar(tank.userData);
 	scene.add(tank);
 	fortressTanks.push(tank);
@@ -901,7 +1020,7 @@ function getSquarePatrolPosition(radius, distance) {
 }
 
 function createPatrolPair(config) {
-	const pair = { ...config, progress: 0, fireTimer: 0, members: [] };
+	const pair = { ...config, progress: 0, decisionTimer: 0, directionLock: 0, patrolMoving: true, members: [] };
 	for (let slot = 0; slot < 2; slot++) {
 		const tank = createFortressTank({
 			name: config.name,
@@ -911,6 +1030,7 @@ function createPatrolPair(config) {
 			hp: config.hp,
 			barrels: config.barrels,
 			cadence: config.cadence,
+			shootTimer: slot * config.cadence * 0.5,
 			bulletSpeed: config.bulletSpeed,
 			pair,
 			slot,
@@ -918,10 +1038,28 @@ function createPatrolPair(config) {
 		});
 		pair.members.push(tank);
 	}
-	for (let slot = 0; slot < pair.members.length; slot++) {
-		const position = getSquarePatrolPosition(pair.radius, pair.progress + slot * pair.radius * 4);
-		const tank = pair.members[slot];
-		if (!isTankPositionBlocked(position.x, position.z, tank)) tank.position.set(position.x, 0, position.z);
+	const perimeter = pair.radius * 8;
+	const startSearchSteps = Math.ceil(perimeter / tankCollisionDistance);
+	let startProgress = 0;
+	for (let attempt = 0; attempt < startSearchSteps; attempt++) {
+		const candidateProgress = attempt * perimeter / startSearchSteps;
+		const positions = pair.members.map(tank => getSquarePatrolPosition(pair.radius, candidateProgress + tank.userData.slot * pair.radius * 4));
+		const pairOverlaps = Math.hypot(positions[0].x - positions[1].x, positions[0].z - positions[1].z) < tankCollisionDistance;
+		const blocked = pairOverlaps || positions.some(position => isTankPositionBlocked(position.x, position.z, null, pair.members));
+		if (!blocked) {
+			startProgress = candidateProgress;
+			break;
+		}
+	}
+	// Keep route progress and tank positions consistent even in a crowded start.
+	// The bounded search normally finds a clear pair of positions before this fallback.
+	pair.progress = startProgress;
+	for (const tank of pair.members) {
+		const progress = pair.progress + tank.userData.slot * pair.radius * 4;
+		const position = getSquarePatrolPosition(pair.radius, progress);
+		const next = getSquarePatrolPosition(pair.radius, progress + 2);
+		tank.position.set(position.x, 0, position.z);
+		tank.rotation.y = Math.atan2(-(next.x - position.x), -(next.z - position.z));
 	}
 	patrolPairs.push(pair);
 	return pair;
@@ -931,12 +1069,12 @@ function setupFortressEncounter() {
 	createPatrolPair({
 		name: 'Outer Sentinel', color: 0xff9f1c, emissive: 0x5c2800, reward: 1500,
 		hp: 110, barrels: 2, cadence: 82, bulletSpeed: 3.2,
-		radius: fortressOuterRadius + 42, direction: 1, patrolSpeed: 0.75, detectRange: 150
+		radius: fortressOuterRadius + 42, direction: 1, patrolSpeed: 0.28, detectRange: 150
 	});
 	createPatrolPair({
 		name: 'Corridor Warden', color: 0xb44cff, emissive: 0x31005c, reward: 2500,
 		hp: 180, barrels: 3, cadence: 58, bulletSpeed: 4.5,
-		radius: (fortressOuterRadius + fortressInnerRadius) / 2, direction: -1, patrolSpeed: 0.6, detectRange: 130
+		radius: (fortressOuterRadius + fortressInnerRadius) / 2, direction: -1, patrolSpeed: 0.22, detectRange: 130
 	});
 }
 setupFortressEncounter();
@@ -945,7 +1083,7 @@ function spawnBoss() {
 	if (bossTank || bossDefeated) return;
 	bossTank = createFortressTank({
 		name: 'Citadel Overlord', color: 0xff315f, emissive: 0x700020, reward: 8000,
-		hp: 440, barrels: 4, cadence: 38, bulletSpeed: 5.5,
+		hp: 440, barrels: 4, cadence: 54, bulletSpeed: 5.5,
 		isBoss: true, shootTimer: 30
 	});
 	// Keep the boss in the courtyard without overlapping the player or another tank.
@@ -954,26 +1092,130 @@ function spawnBoss() {
 	if (spawn) bossTank.position.set(spawn.x, 0, spawn.z);
 }
 
-function updateFortressPatrols() {
+function getEnemyTankMuzzles(tank, targetAngle) {
+	const barrelCount = tank.userData.barrels || 1;
+	const direction = new THREE.Vector3(-Math.sin(targetAngle), 0, -Math.cos(targetAngle));
+	const barrelRight = new THREE.Vector3(Math.cos(targetAngle), 0, -Math.sin(targetAngle));
+	const barrelForwardOffset = tank.userData.isFortress ? 2.7 : 2.9;
+	const muzzlePositions = [];
+	for (let i = 0; i < barrelCount; i++) {
+		const lateralOffset = (i - (barrelCount - 1) / 2) * 0.58;
+		const muzzle = tank.position.clone();
+		muzzle.y = 1.5;
+		muzzle.addScaledVector(direction, barrelForwardOffset).addScaledVector(barrelRight, lateralOffset);
+		muzzlePositions.push(muzzle);
+	}
+	return { direction, muzzlePositions };
+}
+
+function hasEnemyTankClearShot(tank) {
+	const dx = tankPos.x - tank.position.x;
+	const dz = tankPos.z - tank.position.z;
+	const targetAngle = Math.atan2(-dx, -dz);
+	const distance = Math.hypot(dx, dz);
+	const { direction, muzzlePositions } = getEnemyTankMuzzles(tank, targetAngle);
+	return muzzlePositions.some(muzzle => {
+		const rayEnd = muzzle.clone().addScaledVector(direction, distance);
+		return hasClearShot(muzzle, rayEnd);
+	});
+}
+
+function moveBossTowardPlayer(boss, frameScale) {
+	const dx = tankPos.x - boss.position.x;
+	const dz = tankPos.z - boss.position.z;
+	const distance = Math.hypot(dx, dz);
+	if (distance === 0 || (distance <= 96 && hasEnemyTankClearShot(boss))) return;
+	const forwardX = dx / distance;
+	const forwardZ = dz / distance;
+	const side = boss.userData.chaseSide || 1;
+	const directions = distance > 96 ? [
+		{ x: forwardX, z: forwardZ },
+		{ x: -forwardZ * side, z: forwardX * side },
+		{ x: forwardZ * side, z: -forwardX * side }
+	] : [
+		{ x: -forwardZ * side, z: forwardX * side },
+		{ x: forwardZ * side, z: -forwardX * side }
+	];
+	const step = 0.18 * frameScale;
+	const arenaLimit = fortressInnerRadius - 14;
+	for (let index = 0; index < directions.length; index++) {
+		const direction = directions[index];
+		const nextX = boss.position.x + direction.x * step;
+		const nextZ = boss.position.z + direction.z * step;
+		if (Math.abs(nextX) > arenaLimit || Math.abs(nextZ) > arenaLimit ||
+			isBlockedByFortress(nextX, nextZ, 4) || isTankPositionBlocked(nextX, nextZ, boss)) continue;
+		boss.position.x = nextX;
+		boss.position.z = nextZ;
+		boss.rotation.y = Math.atan2(-direction.x, -direction.z);
+		boss.userData.chaseSide = index === 0 ? side : -side;
+		return;
+	}
+	boss.userData.chaseSide = -side;
+}
+
+function updateFortressPatrols(frameScale = 1) {
 	patrolPairs.forEach(pair => {
 		const activeMembers = pair.members.filter(tank => fortressTanks.includes(tank));
 		if (!activeMembers.length) return;
 		const engaged = activeMembers.some(tank => {
 			const distance = Math.hypot(tank.position.x - tankPos.x, tank.position.z - tankPos.z);
-			return distance <= pair.detectRange && hasClearShot(tank.position, tankPos);
+			return distance <= pair.detectRange && hasEnemyTankClearShot(tank);
 		});
-		if (engaged) pair.fireTimer++;
-		const scoreAt = progress => activeMembers.reduce((total, tank) => {
-			const position = getSquarePatrolPosition(pair.radius, progress + tank.userData.slot * pair.radius * 4);
-			return total + Math.hypot(position.x - tankPos.x, position.z - tankPos.z);
-		}, 0);
-		const directions = engaged
-			? [pair.direction, -pair.direction].sort((a, b) => scoreAt(pair.progress + a * pair.patrolSpeed) - scoreAt(pair.progress + b * pair.patrolSpeed))
-			: [pair.direction, -pair.direction];
+		activeMembers.forEach(tank => {
+			if (!tank.userData.turret) return;
+			const distance = Math.hypot(tank.position.x - tankPos.x, tank.position.z - tankPos.z);
+			if (distance <= pair.detectRange) {
+				const targetAngle = Math.atan2(-(tankPos.x - tank.position.x), -(tankPos.z - tank.position.z));
+				tank.userData.turret.rotation.y = targetAngle - tank.rotation.y;
+			} else {
+				// The turret's zero rotation follows the tank's forward heading.
+				tank.userData.turret.rotation.y = 0;
+			}
+		});
+		let patrolMoving = true;
+		if (engaged) {
+			pair.directionLock = Math.max(0, pair.directionLock - frameScale);
+			if (pair.decisionTimer <= 0) {
+				const scoreAt = progress => activeMembers.reduce((total, tank) => {
+					const position = getSquarePatrolPosition(pair.radius, progress + tank.userData.slot * pair.radius * 4);
+					return total + Math.hypot(position.x - tankPos.x, position.z - tankPos.z);
+				}, 0);
+				const currentScore = scoreAt(pair.progress);
+				const lookahead = pair.patrolSpeed * 24;
+				const currentDirectionScore = scoreAt(pair.progress + pair.direction * lookahead);
+				const reverseDirectionScore = scoreAt(pair.progress - pair.direction * lookahead);
+				const improvementMargin = 5;
+				if (currentScore - currentDirectionScore > improvementMargin) {
+					patrolMoving = true;
+				} else if (currentScore - reverseDirectionScore > improvementMargin) {
+					if (pair.directionLock === 0) {
+						pair.direction *= -1;
+						pair.directionLock = 90;
+					}
+					// If a reversal is still locked, continue the current patrol instead
+					// of freezing until the lock expires.
+					patrolMoving = true;
+				} else {
+					patrolMoving = false;
+				}
+				pair.decisionTimer = 24;
+			} else {
+				pair.decisionTimer -= frameScale;
+				patrolMoving = pair.patrolMoving;
+			}
+			pair.patrolMoving = patrolMoving;
+		} else {
+			pair.decisionTimer = 0;
+			pair.directionLock = 0;
+			pair.patrolMoving = true;
+		}
+		// Reassess occasionally with a margin: patrols can pause or reverse
+		// toward the player without reacting to tiny distance changes each frame.
+		const directions = patrolMoving ? [pair.direction, -pair.direction] : [];
 		let nextProgress = pair.progress;
 		let nextPositions = null;
 		for (const direction of directions) {
-			const candidateProgress = pair.progress + direction * pair.patrolSpeed;
+			const candidateProgress = pair.progress + direction * pair.patrolSpeed * frameScale;
 			const candidates = activeMembers.map(tank => ({
 				tank,
 				position: getSquarePatrolPosition(pair.radius, candidateProgress + tank.userData.slot * pair.radius * 4)
@@ -994,39 +1236,43 @@ function updateFortressPatrols() {
 			pair.progress = nextProgress;
 			nextPositions.forEach(({ tank, position }) => {
 				tank.position.set(position.x, 0, position.z);
-				const next = getSquarePatrolPosition(pair.radius, nextProgress + tank.userData.slot * pair.radius * 4 + pair.direction * 2);
+				// Face along the route's canonical direction; reversing travel then
+				// makes the tank back up instead of snapping its body around.
+				const next = getSquarePatrolPosition(pair.radius, nextProgress + tank.userData.slot * pair.radius * 4 + 2);
 				tank.rotation.y = Math.atan2(-(next.x - position.x), -(next.z - position.z));
 			});
 		}
 
-		if (engaged && pair.fireTimer >= pair.cadence) {
-			pair.fireTimer = 0;
-			activeMembers.forEach(tank => {
-				if (Math.hypot(tank.position.x - tankPos.x, tank.position.z - tankPos.z) <= pair.detectRange && hasClearShot(tank.position, tankPos)) fireEnemyTank(tank);
-			});
-		}
+		activeMembers.forEach(tank => {
+			const inRange = Math.hypot(tank.position.x - tankPos.x, tank.position.z - tankPos.z) <= pair.detectRange;
+			if (inRange && hasEnemyTankClearShot(tank)) {
+				tank.userData.shootTimer += frameScale;
+				if (tank.userData.shootTimer >= tank.userData.fireCadence) {
+					tank.userData.shootTimer -= tank.userData.fireCadence;
+					fireEnemyTank(tank);
+				}
+			}
+		});
 	});
 }
 
 function fireEnemyTank(tank) {
-	playSound('enemyShoot');
-	const source = tank.position.clone();
-	source.y = 1.5;
 	const targetAngle = Math.atan2(-(tankPos.x - tank.position.x), -(tankPos.z - tank.position.z));
 	if (tank.userData.turret) tank.userData.turret.rotation.y = targetAngle - tank.rotation.y;
-	const barrelCount = tank.userData.barrels || 1;
-	const direction = new THREE.Vector3(-Math.sin(targetAngle), 0, -Math.cos(targetAngle));
-	const barrelRight = new THREE.Vector3(Math.cos(targetAngle), 0, -Math.sin(targetAngle));
-	for (let i = 0; i < barrelCount; i++) {
+	const { direction, muzzlePositions } = getEnemyTankMuzzles(tank, targetAngle);
+	const distance = Math.hypot(tankPos.x - tank.position.x, tankPos.z - tank.position.z);
+	const clearMuzzles = muzzlePositions.filter(muzzle => hasClearShot(muzzle, muzzle.clone().addScaledVector(direction, distance)));
+	if (!clearMuzzles.length) return;
+	playSound('enemyShoot');
+	for (const muzzle of clearMuzzles) {
 		const bullet = new THREE.Mesh(bulletGeo, new THREE.MeshBasicMaterial({ color: tank.userData.color }));
-		const lateralOffset = (i - (barrelCount - 1) / 2) * 0.58;
-		bullet.position.copy(source).addScaledVector(barrelRight, lateralOffset);
+		bullet.position.copy(muzzle);
 		bullet.userData = {
 			isEnemy: true,
 			velocity: direction.clone().multiplyScalar(tank.userData.bulletSpeed),
 			life: 400,
-			startX: source.x,
-			startZ: source.z,
+			startX: muzzle.x,
+			startZ: muzzle.z,
 			maxDist: 850
 		};
 		scene.add(bullet);
@@ -1116,23 +1362,42 @@ let shootTimer = 0;
 function finishGame(won) {
 	if (isGameOver || isEnding) return;
 	isEnding = true;
+	isGameOver = true;
+	isEnding = false;
 	isGameWon = won;
 	Object.keys(keys).forEach(key => { keys[key] = false; });
 	if (document.exitPointerLock) document.exitPointerLock();
-	endgameTimeout = setTimeout(() => {
-		isEnding = false;
-		isGameOver = true;
-		document.getElementById('gameover-title').innerText = won ? 'FORTRESS CONQUERED' : 'GAME OVER';
-		document.getElementById('gameover-message').innerText = won
-			? 'You entered the tower portal and defeated the Citadel Overlord.'
-			: 'Your tank was destroyed in combat.';
-		document.getElementById('stat-targets').innerText = targetsDestroyedCount;
-		document.getElementById('stat-bots').innerText = botsDestroyedCount;
-		const gameover = document.getElementById('gameover');
-		gameover.classList.toggle('victory', won);
-		gameover.style.display = 'flex';
-		gameover.classList.add('visible');
-	}, 700);
+	document.getElementById('gameover-title').innerText = won ? 'FORTRESS CONQUERED' : 'GAME OVER';
+	document.getElementById('gameover-message').innerText = won
+		? 'You defeated the Citadel Overlord and entered the tower portal.'
+		: 'Your tank was destroyed in combat.';
+	document.getElementById('stat-targets').innerText = targetsDestroyedCount;
+	document.getElementById('stat-bots').innerText = botsDestroyedCount;
+	const gameover = document.getElementById('gameover');
+	gameover.classList.toggle('victory', won);
+	gameover.style.display = 'flex';
+	gameover.classList.add('visible');
+}
+
+function updatePortalCountdown(frameScale) {
+	const countdown = document.getElementById('portal-countdown');
+	const countdownSeconds = document.getElementById('portal-countdown-seconds');
+	const isInsidePortal = portalLocations.some(location =>
+		Math.hypot(tankPos.x - location.x, tankPos.z - location.z) <= 10
+	);
+	if (!bossDefeated || !isInsidePortal || isEnding || isGameOver) {
+		portalCountdownRemaining = 0;
+		if (countdown) countdown.hidden = true;
+		return;
+	}
+	if (portalCountdownRemaining <= 0) portalCountdownRemaining = 5;
+	portalCountdownRemaining = Math.max(0, portalCountdownRemaining - frameScale / 60);
+	if (countdown) countdown.hidden = false;
+	if (countdownSeconds) countdownSeconds.textContent = String(Math.ceil(portalCountdownRemaining));
+	if (portalCountdownRemaining <= 0) {
+		if (countdown) countdown.hidden = true;
+		finishGame(true);
+	}
 }
 
 window.addEventListener('keydown', (e) => {
@@ -1162,10 +1427,14 @@ window.restartGame = function() {
 	bossTank = null;
 	targetsDestroyedCount = 0;
 	botsDestroyedCount = 0;
+	sphereRewardsPaid = 0;
+	enemyBotRewardsPaid = 0;
 	screenShake = 0;
 	shootTimer = 0;
 	lowHpTimer = 0;
 	playerDamageCooldown = 0;
+	portalCountdownRemaining = 0;
+	lastPatrolUpdateTime = performance.now();
 	camYaw = 0;
 	camPitch = 0.4;
 	camDist = 9;
@@ -1178,14 +1447,17 @@ window.restartGame = function() {
 
 	tankPos.set(0, 0, halfArena - 40);
 
-	stats.speed = { level: 1, cost: 100, val: 0.55, mult: 1.55 };
-	stats.rate = { level: 1, cost: 125, val: 12, bulletSpeed: 4.5, mult: 1.6 };
-	stats.multishot = { level: 1, cost: 2500, val: 1, max: 4, mult: 3.0 };
-	stats.maxHp = { level: 1, cost: 200, val: 100, mult: 1.6 };
+	stats.speed = { level: 1, maxLevel: 5, cost: 100, val: 0.55, mult: 1.55 };
+	stats.rate = { level: 1, maxLevel: 5, cost: 125, val: 12, bulletSpeed: 4.5, mult: 1.6 };
+	stats.multishot = { level: 1, cost: 1500, val: 1, max: 4, mult: 1.6 };
+	stats.maxHp = { level: 1, maxLevel: 3, cost: 200, val: 100, mult: 1.6 };
 
 	const multishotBtn = document.getElementById('btn-multishot');
 	multishotBtn.disabled = false;
-	multishotBtn.innerHTML = 'Multi-Barrel ($<span id="cost-multishot">2500</span>)';
+	updateMultishotUpgradeButton();
+	document.getElementById('btn-speed').innerHTML = 'Tank Speed ($<span id="cost-speed">100</span>)';
+	document.getElementById('btn-rate').innerHTML = 'Fire Rate & Velocity ($<span id="cost-rate">125</span>)';
+	document.getElementById('btn-maxhp').innerHTML = 'Max HP Boost ($<span id="cost-maxHp">200</span>)';
 	document.getElementById('cost-speed').innerText = stats.speed.cost;
 	document.getElementById('cost-rate').innerText = stats.rate.cost;
 	document.getElementById('cost-multishot').innerText = stats.multishot.cost;
@@ -1224,6 +1496,10 @@ window.restartGame = function() {
 	portal.visible = false;
 	portalRings.forEach(ring => { ring.rotation.set(0, 0, 0); });
 	portalCores.forEach(core => { core.rotation.set(0, 0, 0); });
+	portalArcs.forEach(arc => { arc.rotation.set(0, 0, 0); });
+	portalParticleFields.forEach(field => { field.rotation.set(0, 0, 0); });
+	portalCoreMaterials.forEach(material => { material.uniforms.uTime.value = 0; });
+	document.getElementById('portal-countdown').hidden = true;
 	updateObjectiveUI();
 
 	bullets.forEach(b => {
@@ -1238,19 +1514,21 @@ window.restartGame = function() {
 // Animation Loop
 function animate() {
 	requestAnimationFrame(animate);
-
+	const patrolNow = performance.now();
+	const frameScale = Math.min(2, Math.max(0, (patrolNow - lastPatrolUpdateTime) / (1000 / 60)));
+	lastPatrolUpdateTime = patrolNow;
 	if (isGameOver) return;
 
-	if (playerDamageCooldown > 0) playerDamageCooldown--;
+	if (playerDamageCooldown > 0) playerDamageCooldown = Math.max(0, playerDamageCooldown - frameScale);
 	if (!isEnding && playerHp < maxPlayerHp) {
-		playerHp = Math.min(maxPlayerHp, playerHp + 0.025);
+		playerHp = Math.min(maxPlayerHp, playerHp + 0.025 * frameScale);
 		updatePlayerHpUI();
 	}
 
 	// Fixed HP-Based Low HP Warning (<= 25 HP)
 	if (playerHp <= 25) {
-		lowHpTimer++;
-		if (lowHpTimer > 45) {
+		lowHpTimer += frameScale;
+		if (lowHpTimer >= 45) {
 			lowHpTimer = 0;
 			playSound('lowHp');
 		}
@@ -1267,7 +1545,7 @@ function animate() {
 	if (keys.left) scratchMove.sub(scratchRight);
 
 	if (!isEnding && scratchMove.lengthSq() > 0) {
-		scratchMove.normalize().multiplyScalar(stats.speed.val);
+		scratchMove.normalize().multiplyScalar(stats.speed.val * frameScale);
 		const nextX = tankPos.x + scratchMove.x;
 		const nextZ = tankPos.z + scratchMove.z;
 		if (!isBlockedByFortress(nextX, tankPos.z, 3) && !isTankPositionBlocked(nextX, tankPos.z, tankGroup)) tankPos.x = nextX;
@@ -1283,7 +1561,7 @@ function animate() {
 	tankGroup.rotation.set(0, tankAngle, 0);
 	tankGroup.updateMatrixWorld();
 
-	shootTimer++;
+	shootTimer += frameScale;
 	if (!isEnding && shootTimer > stats.rate.val) {
 		shootTimer = 0;
 		let count = stats.multishot.val;
@@ -1318,7 +1596,7 @@ function animate() {
 		shakeX = (Math.random() - 0.5) * screenShake;
 		shakeY = (Math.random() - 0.5) * screenShake;
 		shakeZ = (Math.random() - 0.5) * screenShake;
-		screenShake *= 0.85;
+		screenShake *= Math.pow(0.85, frameScale);
 		if (screenShake < 0.02) screenShake = 0;
 	}
 
@@ -1331,11 +1609,11 @@ function animate() {
 
 	const time = Date.now() * 0.002;
 	spheres.forEach(s => {
-		if (s.userData.contactCooldown > 0) s.userData.contactCooldown--;
+		if (s.userData.contactCooldown > 0) s.userData.contactCooldown = Math.max(0, s.userData.contactCooldown - frameScale);
 		if (s.userData.behavior === 'straight') {
 			s.position.x = s.userData.baseX + Math.sin(time + s.userData.floatOffset) * 25;
 		} else if (s.userData.behavior === 'circular') {
-			s.userData.angle += 0.02;
+			s.userData.angle += 0.02 * frameScale;
 			s.position.x = s.userData.baseX + Math.cos(s.userData.angle) * 15;
 			s.position.z = s.userData.baseZ + Math.sin(s.userData.angle) * 15;
 		}
@@ -1358,19 +1636,19 @@ function animate() {
 			bot.rotation.y = targetAngle;
 
 			if (distToPlayer > 15 && hasClearShot(bot.position, tankPos)) {
-				const nextX = bot.position.x - Math.sin(targetAngle) * 0.12;
-				const nextZ = bot.position.z - Math.cos(targetAngle) * 0.12;
+				const nextX = bot.position.x - Math.sin(targetAngle) * 0.12 * frameScale;
+				const nextZ = bot.position.z - Math.cos(targetAngle) * 0.12 * frameScale;
 				if (!isBlockedByFortress(nextX, bot.position.z, 3) && !isTankPositionBlocked(nextX, bot.position.z, bot)) bot.position.x = nextX;
 				if (!isBlockedByFortress(bot.position.x, nextZ, 3) && !isTankPositionBlocked(bot.position.x, nextZ, bot)) bot.position.z = nextZ;
 			}
 
-			bot.userData.shootTimer++;
+			bot.userData.shootTimer += frameScale;
 			if (bot.userData.shootTimer > bot.userData.fireCadence && hasClearShot(bot.position, tankPos)) {
 				bot.userData.shootTimer = 0;
 				fireEnemyTank(bot);
 			}
 		} else {
-			bot.userData.patrolAngle += 0.01;
+			bot.userData.patrolAngle += 0.01 * frameScale;
 			const patrolX = bot.userData.baseX + Math.cos(bot.userData.patrolAngle) * 20;
 			const patrolZ = bot.userData.baseZ + Math.sin(bot.userData.patrolAngle) * 20;
 			if (!isBlockedByFortress(patrolX, patrolZ, 3) && !isTankPositionBlocked(patrolX, patrolZ, bot)) {
@@ -1381,13 +1659,22 @@ function animate() {
 		}
 	});
 
-	updateFortressPatrols();
+	updateFortressPatrols(frameScale);
 	updateFortressProgression();
 	if (bossTank && fortressTanks.includes(bossTank)) {
-		const bossDistance = Math.hypot(bossTank.position.x - tankPos.x, bossTank.position.z - tankPos.z);
-		if (bossDistance < 220 && hasClearShot(bossTank.position, tankPos)) {
+		if (bossTank.userData.bossAura) {
+			bossTank.userData.bossAura.rotation.z += 0.012 * frameScale;
+			const pulse = 1 + Math.sin(performance.now() * 0.003) * 0.06;
+			bossTank.userData.bossAura.scale.set(pulse, pulse, pulse);
+		}
+		let bossDistance = Math.hypot(bossTank.position.x - tankPos.x, bossTank.position.z - tankPos.z);
+		if (bossDistance >= 220 || !hasEnemyTankClearShot(bossTank)) {
+			moveBossTowardPlayer(bossTank, frameScale);
+			bossDistance = Math.hypot(bossTank.position.x - tankPos.x, bossTank.position.z - tankPos.z);
+		}
+		if (bossDistance < 220 && hasEnemyTankClearShot(bossTank)) {
 			bossTank.rotation.y = Math.atan2(-(tankPos.x - bossTank.position.x), -(tankPos.z - bossTank.position.z));
-			bossTank.userData.shootTimer++;
+			bossTank.userData.shootTimer += frameScale;
 			if (bossTank.userData.shootTimer >= bossTank.userData.fireCadence) {
 				bossTank.userData.shootTimer = 0;
 				fireEnemyTank(bossTank);
@@ -1396,22 +1683,30 @@ function animate() {
 	}
 
 	if (bossDefeated) {
-		portalRings.forEach(ring => { ring.rotation.z += 0.025; });
-		portalCores.forEach(core => { core.rotation.z -= 0.012; });
-		const enteredPortal = portalLocations.some(location => {
-			const innerX = location.x * 0.8;
-			const innerZ = location.z * 0.8;
-			return Math.hypot(tankPos.x - innerX, tankPos.z - innerZ) < 5;
+		const portalTime = performance.now() * 0.001;
+		portalRings.forEach((ring, index) => {
+			ring.rotation.z += (index % 2 === 0 ? 0.035 : -0.025) * frameScale;
+			const pulse = 1 + Math.sin(portalTime * 2.4 + index) * 0.035;
+			ring.scale.set(pulse, pulse, pulse);
 		});
-		if (enteredPortal) finishGame(true);
+		portalArcs.forEach((arc, index) => {
+			arc.rotation.z += (index % 2 === 0 ? 0.055 : -0.045) * frameScale;
+		});
+		portalParticleFields.forEach((field, index) => {
+			field.rotation.z += (index % 2 === 0 ? 0.012 : -0.01) * frameScale;
+		});
+		portalCoreMaterials.forEach((material, index) => {
+			material.uniforms.uTime.value = portalTime + index * 0.7;
+		});
+		updatePortalCountdown(frameScale);
 	}
 
 	for (let i = bullets.length - 1; i >= 0; i--) {
 		const b = bullets[i];
-		b.userData.life--;
+		b.userData.life -= frameScale;
 
-		const subSteps = Math.max(4, Math.ceil(b.userData.velocity.length() / 1.5));
-		scratchSubVel.copy(b.userData.velocity).divideScalar(subSteps);
+		const subSteps = Math.max(4, Math.ceil(b.userData.velocity.length() * frameScale / 1.5));
+		scratchSubVel.copy(b.userData.velocity).multiplyScalar(frameScale).divideScalar(subSteps);
 		let hitRegistered = false;
 		let wallBounce = false;
 
@@ -1434,10 +1729,14 @@ function animate() {
 						spawnHitParticles(b.position, s.userData.color);
 
 						if (s.userData.hp <= 0) {
-							cash += s.userData.reward;
+							const reward = sphereRewardsPaid < sphereCount ? s.userData.reward : 0;
+							if (reward > 0) {
+								cash += reward;
+								sphereRewardsPaid++;
+							}
 							targetsDestroyedCount++;
 							document.getElementById('cash').innerText = cash;
-							showNotification(`Destroyed ${s.userData.name}! +$${s.userData.reward}`);
+							if (reward > 0) showNotification(`Destroyed ${s.userData.name}! +$${reward}`);
 							playSound('destroy');
 
 							disposeHealthBar(s.userData.hpBar);
@@ -1461,10 +1760,14 @@ function animate() {
 							spawnHitParticles(b.position, bot.userData.color);
 
 							if (bot.userData.hp <= 0) {
-								cash += bot.userData.reward;
+								const reward = enemyBotRewardsPaid < enemyBotCount ? bot.userData.reward : 0;
+								if (reward > 0) {
+									cash += reward;
+									enemyBotRewardsPaid++;
+								}
 								botsDestroyedCount++;
 								document.getElementById('cash').innerText = cash;
-								showNotification(`Destroyed ${bot.userData.name}! +$${bot.userData.reward}`);
+								if (reward > 0) showNotification(`Destroyed ${bot.userData.name}! +$${reward}`);
 								playSound('destroy');
 
 								disposeHealthBar(bot.userData.hpBar);
@@ -1535,8 +1838,8 @@ function animate() {
 
 	for (let i = particles.length - 1; i >= 0; i--) {
 		const p = particles[i];
-		p.position.add(p.userData.vel);
-		p.userData.life--;
+		p.position.addScaledVector(p.userData.vel, frameScale);
+		p.userData.life -= frameScale;
 		if (p.userData.life <= 0) {
 			scene.remove(p);
 			particles.splice(i, 1);
